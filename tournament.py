@@ -112,93 +112,113 @@ with st.expander("📌 Инструкция", expanded=not st.session_state.init
     st.markdown("""
     **Как пользоваться программой:**
 
-    1. Введите имена участников через запятую или по одному на строке.  
+    1. Введите имена участников через запятую или по одной строке.  
        Пример: `Анна, Борис, Вера`
 
-    2. Тип турнира выбирается автоматически:  
-       • **2–8 участников** → круговой турнир (каждый играет с каждым);  
-       • **9+ участников** → швейцарская система (до 6 туров, без повторных встреч).
+    2. Тип турнира:  
+       • **2–8 участников** → круговой (каждый с каждым, число туров фиксировано);  
+       • **9+ участников** → швейцарская система (**вы сами выбираете от 3 до 11 туров**).
 
-    3. После начала появятся туры. Выберите результат каждой партии:  
-       `1-0` (победа первого), `0-1` (победа второго), `1/2-1/2` (ничья).  
-       При нечётном числе — один получает **BYE** (+1 очко).
+    3. В каждом туре выберите результат:  
+       `1-0`, `0-1`, `1/2-1/2`. При нечётном числе — один получает **BYE** (+1 очко).
 
     4. Таблица обновляется автоматически:  
        • Сортировка: **очки → Бухгольц → имя**.  
        • Первые три места: 👑 🥈 🥉
 
-    5. Программа гарантирует:  
+    5. Гарантии:  
        • Нет повторных встреч;  
-       • BYE даётся справедливо (не чаще одного раза).
+       • BYE даётся не чаще одного раза.
     """)
 
-# =============== Ввод участников ===============
+# =============== Ввод участников и выбор числа туров ===============
 if not st.session_state.initialized:
     names_input = st.text_area(
         "Введите имена участников (через запятую или по одной):",
         height=100,
         placeholder="Анна, Борис, Вера\nили\nАнна\nБорис\nВера"
     )
+
+    names = []
+    raw = names_input.strip()
+    if raw:
+        names = [n.strip() for n in raw.replace("\n", ",").split(",") if n.strip()]
+        names = list(dict.fromkeys(names))
+
+    n_players = len(names)
+    is_round_robin = (2 <= n_players <= 8)
+
+    if n_players > 0:
+        st.info(f"Участников: {n_players} → {'круговой турнир' if is_round_robin else 'швейцарская система'}")
+
+    total_rounds_input = 6
+    if n_players >= 9:
+        total_rounds_input = st.slider(
+            "Выберите количество туров:",
+            min_value=3,
+            max_value=11,
+            value=min(7, 11),
+            help="Для швейцарской системы. Максимум — 11 туров."
+        )
+    elif is_round_robin:
+        auto_rounds = n_players - 1 if n_players % 2 == 0 else n_players
+        st.info(f"Круговой турнир: автоматически {auto_rounds} туров.")
+
     if st.button("Начать турнир", type="primary"):
-        raw = names_input.strip()
         if not raw:
             st.error("Введите хотя бы одно имя!")
+        elif n_players < 2:
+            st.error("Нужно минимум 2 участника!")
         else:
-            names = [n.strip() for n in raw.replace("\n", ",").split(",") if n.strip()]
-            names = list(dict.fromkeys(names))  # удалить дубли
-            if len(names) < 2:
-                st.error("Нужно минимум 2 участника!")
+            st.session_state.players = names
+            st.session_state.is_round_robin = is_round_robin
+            st.session_state.scores = {p: 0.0 for p in names}
+            st.session_state.opponents = defaultdict(list)
+            st.session_state.played_pairs.clear()
+            st.session_state.bye_history.clear()
+            st.session_state.tour_data = {}
+            st.session_state.completed = False
+
+            if is_round_robin:
+                st.session_state.total_rounds = n_players - 1 if n_players % 2 == 0 else n_players
             else:
-                # Инициализация
-                st.session_state.players = names
-                n = len(names)
-                st.session_state.is_round_robin = (n <= 8)
-                st.session_state.scores = {p: 0.0 for p in names}
-                st.session_state.opponents = defaultdict(list)
-                st.session_state.played_pairs.clear()
-                st.session_state.bye_history.clear()
-                st.session_state.tour_data = {}
-                st.session_state.completed = False
+                st.session_state.total_rounds = total_rounds_input
 
-                if st.session_state.is_round_robin:
-                    st.session_state.total_rounds = n - 1 if n % 2 == 0 else n
-                    st.session_state.round_robin_schedule = generate_round_robin_schedule(names)
-                else:
-                    st.session_state.total_rounds = min(6, max(4, (n + 1).bit_length()))
+            if is_round_robin:
+                st.session_state.round_robin_schedule = generate_round_robin_schedule(names)
 
-                # Создать пустые туры
-                for rnd in range(1, st.session_state.total_rounds + 1):
-                    st.session_state.tour_data[rnd] = {
-                        "pairs": [],
-                        "bye": None,
-                        "results": [],
-                        "completed": False
-                    }
+            for rnd in range(1, st.session_state.total_rounds + 1):
+                st.session_state.tour_data[rnd] = {
+                    "pairs": [],
+                    "bye": None,
+                    "results": [],
+                    "completed": False
+                }
 
-                # Сгенерировать первый тур
-                if st.session_state.is_round_robin:
-                    round_pairs = st.session_state.round_robin_schedule[0]
-                    real_pairs = []
-                    bye = None
-                    for p1, p2 in round_pairs:
-                        if p1 is None:
-                            bye = p2
-                        elif p2 is None:
-                            bye = p1
-                        else:
-                            real_pairs.append((p1, p2))
-                    st.session_state.tour_data[1]["pairs"] = real_pairs
-                    st.session_state.tour_data[1]["bye"] = bye
-                else:
-                    pairs, bye = initial_pairing(names[:])
-                    st.session_state.tour_data[1]["pairs"] = pairs
-                    st.session_state.tour_data[1]["bye"] = bye
-                    if bye:
-                        st.session_state.bye_history.add(bye)
+            # Первый тур
+            if is_round_robin:
+                round_pairs = st.session_state.round_robin_schedule[0]
+                real_pairs = []
+                bye = None
+                for p1, p2 in round_pairs:
+                    if p1 is None:
+                        bye = p2
+                    elif p2 is None:
+                        bye = p1
+                    else:
+                        real_pairs.append((p1, p2))
+                st.session_state.tour_data[1]["pairs"] = real_pairs
+                st.session_state.tour_data[1]["bye"] = bye
+            else:
+                pairs, bye = initial_pairing(names[:])
+                st.session_state.tour_data[1]["pairs"] = pairs
+                st.session_state.tour_data[1]["bye"] = bye
+                if bye:
+                    st.session_state.bye_history.add(bye)
 
-                st.session_state.current_round = 1
-                st.session_state.initialized = True
-                st.rerun()
+            st.session_state.current_round = 1
+            st.session_state.initialized = True
+            st.rerun()
 
 # =============== Основной интерфейс после старта ===============
 if st.session_state.initialized and not st.session_state.completed:
@@ -216,7 +236,6 @@ if st.session_state.initialized and not st.session_state.completed:
         if current < st.session_state.total_rounds:
             if st.button(f"Перейти к туру {current + 1}"):
                 st.session_state.current_round += 1
-                # Генерация следующего тура (если ещё не создан)
                 next_rnd = current + 1
                 if not st.session_state.tour_data[next_rnd]["pairs"]:
                     if st.session_state.is_round_robin:
@@ -268,7 +287,6 @@ if st.session_state.initialized and not st.session_state.completed:
             st.info(f"BYE: {data['bye']} (+1 очко)")
 
         if st.button("Завершить тур", type="primary"):
-            # Обновление очков
             for p1, p2, res in results:
                 st.session_state.opponents[p1].append(p2)
                 st.session_state.opponents[p2].append(p1)
