@@ -204,7 +204,7 @@ if not st.session_state.initialized:
                 st.session_state.show_fide_id = show_fide_id
                 st.rerun()
 
-        # Показываем "Рейтинг по умолчанию" только если выбран хотя бы один рейтинг
+        # 🔴 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: определяем ДО цикла
         show_rating_fields = st.session_state.show_nat_rating or st.session_state.show_fide_rating
         if show_rating_fields:
             st.session_state.default_rating = st.number_input(
@@ -296,7 +296,7 @@ if not st.session_state.initialized:
                         "fshr_id": "", "fide_id": ""
                     }
                 st.divider()
-
+    
     # =============== Вкладка 2: Туры ===============
     with tabs[1]:
         valid_players = [
