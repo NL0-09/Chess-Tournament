@@ -204,7 +204,6 @@ if not st.session_state.initialized:
                 st.session_state.show_fide_id = show_fide_id
                 st.rerun()
 
-        # 🔴 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: определяем ДО цикла
         show_rating_fields = st.session_state.show_nat_rating or st.session_state.show_fide_rating
         if show_rating_fields:
             st.session_state.default_rating = st.number_input(
@@ -338,7 +337,7 @@ if not st.session_state.initialized:
                 else:
                     recommended = math.ceil(math.log2(n_players)) + 2
                     max_circle = n_players if n_players % 2 == 1 else n_players - 1
-                    max_swiss = min(max_circle, recommended + 2)
+                    max_swiss = min(max_circle - 1, recommended + 2)
                     min_swiss = recommended
                     if min_swiss > max_swiss:
                         min_swiss = max_swiss
@@ -347,7 +346,7 @@ if not st.session_state.initialized:
                         min_value=min_swiss,
                         max_value=max_swiss,
                         value=recommended,
-                        help=f"Рекомендуется {recommended} туров. Максимум без повторных встреч: {max_circle}."
+                        help=f"Рекомендуется {recommended} туров. Максимум без превращения в круговой: {max_swiss}."
                     )
 
             if st.button("Начать турнир", type="primary"):
@@ -577,3 +576,4 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
+
