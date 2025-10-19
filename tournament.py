@@ -304,8 +304,8 @@ if not st.session_state.initialized:
         ]
         n_players = len(valid_players)
 
-        if n_players == 0:
-            st.warning("Добавьте хотя бы одного игрока на вкладке «Игроки и рейтинги».")
+        if n_players < 2:
+            st.warning("Добавьте хотя бы двух игроков на вкладке «Игроки и рейтинги».")
         else:
             st.info(f"Участников: {n_players}")
             total_rounds = None
@@ -337,7 +337,7 @@ if not st.session_state.initialized:
                 else:
                     recommended = math.ceil(math.log2(n_players)) + 2
                     max_circle = n_players if n_players % 2 == 1 else n_players - 1
-                    max_swiss = min(max_circle - 1, recommended + 2)
+                    max_swiss = min(max_circle - 1, recommended + 2)  # исправлено: -1
                     min_swiss = recommended
                     if min_swiss > max_swiss:
                         min_swiss = max_swiss
@@ -365,6 +365,7 @@ if not st.session_state.initialized:
                     players_list = []
                     ratings_dict = {}
                     default_rating = st.session_state.default_rating
+                    show_rating_fields = st.session_state.show_nat_rating or st.session_state.show_fide_rating
 
                     for p in st.session_state.players_data:
                         full_name = f"{p['last_name'].strip()} {p['first_name'].strip()}"
@@ -576,4 +577,5 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
+
 
