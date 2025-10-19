@@ -137,75 +137,134 @@ if not st.session_state.initialized:
     with tabs[0]:
         st.subheader("Игроки")
         
-        # Кнопки управления
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("➕ Добавить игрока"):
-                st.session_state.players_data.append({
-                    "last_name": "", "first_name": "",
-                    "nat_rating": "", "fide_rating": "",
-                    "fshr_id": "", "fide_id": ""
-                })
-        with col2:
-            if st.button("🗑️ Удалить последнего") and st.session_state.players_data:
-                st.session_state.players_data.pop()
+        # Кнопка добавления
+        if st.button("➕ Добавить игрока"):
+            st.session_state.players_data.append({
+                "last_name": "", "first_name": "",
+                "nat_rating": "", "fide_rating": "",
+                "fshr_id": "", "fide_id": ""
+            })
 
-        # Чекбокс для рейтинговой информации
-        use_ratings = st.checkbox("Добавить рейтинговую информацию", value=st.session_state.use_ratings)
-        st.session_state.use_ratings = use_ratings
+        # Выбор дополнительных полей через expander
+        with st.expander("Дополнительная информация", expanded=False):
+            st.markdown("Выберите, какие поля отображать:")
+            cols = st.columns(2)
+            with cols[0]:
+                show_nat_rating = st.checkbox("Рейтинг ФШР", value=st.session_state.get("show_nat_rating", False))
+                show_fshr_id = st.checkbox("ID ФШР", value=st.session_state.get("show_fshr_id", False))
+            with cols[1]:
+                show_fide_rating = st.checkbox("Рейтинг ФИДЕ", value=st.session_state.get("show_fide_rating", False))
+                show_fide_id = st.checkbox("ID ФИДЕ", value=st.session_state.get("show_fide_id", False))
+            
+            if st.button("Применить"):
+                st.session_state.show_nat_rating = show_nat_rating
+                st.session_state.show_fide_rating = show_fide_rating
+                st.session_state.show_fshr_id = show_fshr_id
+                st.session_state.show_fide_id = show_fide_id
+                st.rerun()
+            if st.button("Отмена"):
+                st.rerun()
 
-        if use_ratings:
+        # Определяем, какие поля показывать
+        show_nat = st.session_state.get("show_nat_rating", False)
+        show_fide = st.session_state.get("show_fide_rating", False)
+        show_fshr = st.session_state.get("show_fshr_id", False)
+        show_fid = st.session_state.get("show_fide_id", False)
+        any_rating_field = show_nat or show_fide or show_fshr or show_fid
+
+        # Поле "Рейтинг по умолчанию" (только если есть рейтинговые поля)
+        if any_rating_field:
             st.session_state.default_rating = st.number_input(
                 "Рейтинг по умолчанию",
                 value=st.session_state.default_rating,
                 min_value=0,
-                step=1
+                step=1,
+                help="Будет использован для пустых рейтингов."
             )
 
         # Поля ввода для каждого игрока
         for i, player in enumerate(st.session_state.players_data):
-            st.markdown(f"**Игрок {i+1}**")
-            cols = st.columns(2)
-            with cols[0]:
-                last_name = st.text_input(
-                    "Фамилия", 
-                    value=player["last_name"], 
-                    key=f"last_{i}"
-                )
-            with cols[1]:
-                first_name = st.text_input(
-                    "Имя", 
-                    value=player["first_name"], 
-                    key=f"first_{i}"
-                )
-            
-            if use_ratings:
-                cols2 = st.columns(4)
-                with cols2[0]:
-                    nat_rating = st.text_input("Национальный рейтинг", value=str(player["nat_rating"]) if player["nat_rating"] != "" else "", key=f"nat_{i}")
-                with cols2[1]:
-                    fide_rating = st.text_input("Рейтинг FIDE", value=str(player["fide_rating"]) if player["fide_rating"] != "" else "", key=f"fide_{i}")
-                with cols2[2]:
-                    fshr_id = st.text_input("ID ФШР", value=player["fshr_id"], key=f"fshr_{i}")
-                with cols2[3]:
-                    fide_id = st.text_input("ID FIDE", value=player["fide_id"], key=f"id_{i}")
+            with st.container():
+                st.markdown(f"**Игрок {i+1}**")
+                cols = st.columns([3, 3, 1])
+                with cols[0]:
+                    last_name = st.text_input(
+                        "Фамилия", 
+                        value=player["last_name"], 
+                        key=f"last_{i}"
+                    )
+                with cols[1]:
+                    first_name = st.text_input(
+                        "Имя", 
+                        value=player["first_name"], 
+                        key=f"first_{i}"
+                    )
+                with cols[2]:
+                    # Кнопка удаления (красная иконка)
+                    if st.button("🗑️", key=f"del_{i}", help="Удалить игрока"):
+                        st.session_state.players_data.pop(i)
+                        st.rerun()
                 
-                st.session_state.players_data[i] = {
-                    "last_name": last_name,
-                    "first_name": first_name,
-                    "nat_rating": nat_rating,
-                    "fide_rating": fide_rating,
-                    "fshr_id": fshr_id,
-                    "fide_id": fide_id
-                }
-            else:
-                st.session_state.players_data[i] = {
-                    "last_name": last_name,
-                    "first_name": first_name,
-                    "nat_rating": "", "fide_rating": "",
-                    "fshr_id": "", "fide_id": ""
-                }
-            st.divider()
+                # Дополнительные поля (если выбраны)
+                if any_rating_field:
+                    extra_cols = []
+                    widths = []
+                    if show_nat: widths.append(2)
+                    if show_fide: widths.append(2)
+                    if show_fshr: widths.append(1)
+                    if show_fid: widths.append(1)
+                    
+                    if widths:
+                        extra_cols = st.columns(widths)
+                        idx = 0
+                        if show_nat:
+                            with extra_cols[idx]:
+                                nat_rating = st.text_input(
+                                    "Рейтинг ФШР", 
+                                    value=str(player["nat_rating"]) if player["nat_rating"] != "" else "", 
+                                    key=f"nat_{i}"
+                                )
+                            idx += 1
+                        if show_fide:
+                            with extra_cols[idx]:
+                                fide_rating = st.text_input(
+                                    "Рейтинг ФИДЕ", 
+                                    value=str(player["fide_rating"]) if player["fide_rating"] != "" else "", 
+                                    key=f"fide_{i}"
+                                )
+                            idx += 1
+                        if show_fshr:
+                            with extra_cols[idx]:
+                                fshr_id = st.text_input("ID ФШР", value=player["fshr_id"], key=f"fshr_{i}")
+                            idx += 1
+                        if show_fid:
+                            with extra_cols[idx]:
+                                fide_id = st.text_input("ID ФИДЕ", value=player["fide_id"], key=f"fid_{i}")
+                        
+                        # Обновляем данные игрока
+                        st.session_state.players_data[i] = {
+                            "last_name": last_name,
+                            "first_name": first_name,
+                            "nat_rating": nat_rating if show_nat else "",
+                            "fide_rating": fide_rating if show_fide else "",
+                            "fshr_id": fshr_id if show_fshr else "",
+                            "fide_id": fide_id if show_fid else ""
+                        }
+                    else:
+                        st.session_state.players_data[i] = {
+                            "last_name": last_name,
+                            "first_name": first_name,
+                            "nat_rating": "", "fide_rating": "",
+                            "fshr_id": "", "fide_id": ""
+                        }
+                else:
+                    st.session_state.players_data[i] = {
+                        "last_name": last_name,
+                        "first_name": first_name,
+                        "nat_rating": "", "fide_rating": "",
+                        "fshr_id": "", "fide_id": ""
+                    }
+                st.divider()
 
     # =============== Вкладка 2: Туры ===============
     with tabs[1]:
@@ -472,4 +531,3 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
-
