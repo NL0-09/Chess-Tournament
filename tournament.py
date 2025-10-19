@@ -203,8 +203,6 @@ if not st.session_state.initialized:
                 st.session_state.show_fshr_id = show_fshr_id
                 st.session_state.show_fide_id = show_fide_id
                 st.rerun()
-            if st.button("Отмена"):
-                st.rerun()
 
         show_nat = st.session_state.show_nat_rating
         show_fide = st.session_state.show_fide_rating
@@ -567,3 +565,4 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
+
