@@ -38,7 +38,7 @@ def decide_colors(p1, p2, color_history, current_round, total_rounds):
         return (p2, p1)
 
 def generate_round_robin_schedule(players, rounds_needed):
-    """Генерация расписания кругового турнира с фиксацией цветов."""
+    """Генерация расписания кругового турнира."""
     players = players[:]
     n = len(players)
     is_odd = (n % 2 == 1)
@@ -50,7 +50,6 @@ def generate_round_robin_schedule(players, rounds_needed):
     full_schedule = []
     current = players[:]
 
-    # Первый круг
     for r in range(base_rounds):
         pairs = []
         for i in range(n // 2):
@@ -61,11 +60,10 @@ def generate_round_robin_schedule(players, rounds_needed):
             elif p2 == "BYE":
                 pairs.append((p1, None))
             else:
-                pairs.append((p1, p2))  # p1 — белые, p2 — чёрные
+                pairs.append((p1, p2))
         full_schedule.append(pairs)
         current = [current[0]] + [current[-1]] + current[1:-1]
 
-    # Второй круг — меняем порядок в парах (белые/чёрные меняются)
     if rounds_needed > base_rounds:
         second_circle = []
         for pairs in full_schedule:
@@ -74,11 +72,35 @@ def generate_round_robin_schedule(players, rounds_needed):
                 if p1 is None or p2 is None:
                     new_pairs.append((p1, p2))
                 else:
-                    new_pairs.append((p2, p1))  # p2 — белые, p1 — чёрные
+                    new_pairs.append((p2, p1))  # меняем цвета во втором круге
             second_circle.append(new_pairs)
         full_schedule.extend(second_circle)
 
     return full_schedule[:rounds_needed]
+
+def assign_colors_round_robin(pairs, white_count, bye_count):
+    """Назначает цвета с учётом числа BYE."""
+    new_pairs = []
+    for p1, p2 in pairs:
+        if p1 is None or p2 is None:
+            new_pairs.append((p1, p2))
+        else:
+            w1, w2 = white_count[p1], white_count[p2]
+            b1, b2 = bye_count[p1], bye_count[p2]
+            if w1 < w2:
+                white, black = p1, p2
+            elif w2 < w1:
+                white, black = p2, p1
+            else:
+                if b1 > b2:
+                    white, black = p2, p1
+                elif b2 > b1:
+                    white, black = p1, p2
+                else:
+                    white, black = (p1, p2) if p1 < p2 else (p2, p1)
+            white_count[white] += 1
+            new_pairs.append((white, black))
+    return new_pairs
 
 def initial_pairing_with_colors(players, color_history, current_round, total_rounds):
     random.shuffle(players)
@@ -96,7 +118,6 @@ def swiss_pairing_with_colors(players, scores, played_pairs, bye_history, color_
     paired = set()
     pairs = []
 
-    # Проходы с разным допуском по очкам
     for max_diff in [0.5, 1.0, float('inf')]:
         for i, p1 in enumerate(sorted_players):
             if p1 in paired:
@@ -138,13 +159,8 @@ def swiss_pairing_with_colors(players, scores, played_pairs, bye_history, color_
                     pairs.append((white, black))
                     played_pairs.add(frozenset({a, b}))
     else:
-        # Чётное число — все ДОЛЖНЫ быть спарены
         if len(unpaired) > 0:
-            # Это ошибка, но мы не даём BYE и не спариваем повторно
-            st.warning(f"Не удалось спарить всех игроков в туре {current_round}. Остались: {', '.join(unpaired)}")
-            # В реальной системе здесь должен быть более умный алгоритм
-            pass
-
+            st.warning(f"Не удалось спарить всех игроков в туре {current_round}.")
     return pairs, bye
 
 def calculate_buchholz(players, scores, opponents):
@@ -159,9 +175,6 @@ def calculate_buchholz(players, scores, opponents):
 st.set_page_config(page_title="Шахматный турнир", layout="wide")
 st.title("♟️ Шахматный турнир")
 
-# Инициализация состояния
-if "step" not in st.session_state:
-    st.session_state.step = "players"
 if "players_data" not in st.session_state:
     st.session_state.players_data = []
 if "show_nat_rating" not in st.session_state:
@@ -190,6 +203,8 @@ if "initialized" not in st.session_state:
     st.session_state.completed = False
     st.session_state.ratings = {}
     st.session_state.color_history = defaultdict(list)
+    st.session_state.white_count = defaultdict(int)
+    st.session_state.bye_count = defaultdict(int)
 
 # =============== Вкладки ===============
 if not st.session_state.initialized:
@@ -199,7 +214,6 @@ if not st.session_state.initialized:
     with tabs[0]:
         st.subheader("Игроки")
 
-        # --- Expander с настройками ---
         with st.expander("Дополнительная информация", expanded=False):
             st.markdown("Выберите, какие поля отображать:")
             cols = st.columns(2)
@@ -217,7 +231,6 @@ if not st.session_state.initialized:
                 st.session_state.show_fide_id = show_fide_id
                 st.rerun()
 
-        # --- Поле "Рейтинг по умолчанию" (если нужно) ---
         show_rating_fields = st.session_state.show_nat_rating or st.session_state.show_fide_rating
         if show_rating_fields:
             st.session_state.default_rating = st.number_input(
@@ -228,7 +241,6 @@ if not st.session_state.initialized:
                 help="Будет использован для пустых рейтингов."
             )
 
-        # --- Список игроков ---
         for i, player in enumerate(st.session_state.players_data):
             with st.container():
                 st.markdown(f"**Игрок {i+1}**")
@@ -246,7 +258,6 @@ if not st.session_state.initialized:
                         st.session_state.players_data.pop(i)
                         st.rerun()
                 
-                # Дополнительные поля
                 any_extra = (st.session_state.show_nat_rating or 
                             st.session_state.show_fide_rating or 
                             st.session_state.show_fshr_id or 
@@ -292,19 +303,15 @@ if not st.session_state.initialized:
                     }
                 st.divider()
 
-        # --- КНОПКА В САМОМ НИЗУ ---
         st.button("➕ Добавить игрока", on_click=lambda: st.session_state.players_data.append({
             "last_name": "", "first_name": "",
             "nat_rating": "", "fide_rating": "",
             "fshr_id": "", "fide_id": ""
         }))
-    
+
     # =============== Вкладка 2: Туры ===============
     with tabs[1]:
-        valid_players = [
-            p for p in st.session_state.players_data 
-            if p["last_name"].strip() and p["first_name"].strip()
-        ]
+        valid_players = [p for p in st.session_state.players_data if p["last_name"].strip() and p["first_name"].strip()]
         n_players = len(valid_players)
 
         if n_players < 2:
@@ -315,23 +322,14 @@ if not st.session_state.initialized:
             tournament_type = None
 
             if n_players < 7:
-                tournament_type = st.radio(
-                    "Выберите тип турнира:",
-                    options=["Один круг", "Два круга"],
-                    index=0,
-                    help="При менее чем 7 участниках швейцарская система не рекомендуется."
-                )
+                tournament_type = st.radio("Выберите тип турнира:", ["Один круг", "Два круга"], index=0)
                 if tournament_type == "Один круг":
                     total_rounds = n_players if n_players % 2 == 1 else n_players - 1
                 else:
                     base = n_players if n_players % 2 == 1 else n_players - 1
                     total_rounds = 2 * base
             else:
-                tournament_type = st.radio(
-                    "Выберите тип турнира:",
-                    options=["Один круг", "Два круга", "Швейцарская система"],
-                    index=2
-                )
+                tournament_type = st.radio("Выберите тип турнира:", ["Один круг", "Два круга", "Швейцарская система"], index=2)
                 if tournament_type == "Один круг":
                     total_rounds = n_players if n_players % 2 == 1 else n_players - 1
                 elif tournament_type == "Два круга":
@@ -340,28 +338,19 @@ if not st.session_state.initialized:
                 else:
                     recommended = math.ceil(math.log2(n_players)) + 2
                     max_circle = n_players if n_players % 2 == 1 else n_players - 1
-                    max_swiss = min(max_circle - 1, recommended + 2)  # исправлено: -1
+                    max_swiss = min(max_circle - 1, recommended + 2)
                     min_swiss = recommended
                     if min_swiss > max_swiss:
                         min_swiss = max_swiss
-                    total_rounds = st.slider(
-                        "Количество туров:",
-                        min_value=min_swiss,
-                        max_value=max_swiss,
-                        value=recommended,
-                        help=f"Рекомендуется {recommended} туров. Максимум без превращения в круговой: {max_swiss}."
-                    )
+                    total_rounds = st.slider("Количество туров:", min_swiss, max_swiss, recommended)
 
             if st.button("Начать турнир", type="primary"):
                 errors = []
                 for i, p in enumerate(st.session_state.players_data):
-                    if not p["last_name"].strip():
-                        errors.append(f"У игрока {i+1} не указана фамилия.")
-                    if not p["first_name"].strip():
-                        errors.append(f"У игрока {i+1} не указано имя.")
+                    if not p["last_name"].strip(): errors.append(f"У игрока {i+1} не указана фамилия.")
+                    if not p["first_name"].strip(): errors.append(f"У игрока {i+1} не указано имя.")
                 if errors:
-                    for err in errors:
-                        st.error(err)
+                    for err in errors: st.error(err)
                 elif tournament_type is None:
                     st.error("Выберите тип турнира.")
                 else:
@@ -370,13 +359,11 @@ if not st.session_state.initialized:
                     default_rating = st.session_state.default_rating
                     show_rating_fields = st.session_state.show_nat_rating or st.session_state.show_fide_rating
 
-                    for p in st.session_state.players_data:
+                    for p in st.session_state.players_
                         full_name = f"{p['last_name'].strip()} {p['first_name'].strip()}"
                         players_list.append(full_name)
-
                         if show_rating_fields:
-                            nat = p["nat_rating"]
-                            fide = p["fide_rating"]
+                            nat = p["nat_rating"]; fide = p["fide_rating"]
                             nat_val = default_rating if nat == "" else int(nat) if nat.isdigit() else default_rating
                             fide_val = default_rating if fide == "" else int(fide) if fide.isdigit() else default_rating
                             ratings_dict[full_name] = {"nat": nat_val, "fide": fide_val}
@@ -392,45 +379,32 @@ if not st.session_state.initialized:
                     st.session_state.completed = False
                     st.session_state.total_rounds = total_rounds
                     st.session_state.color_history = defaultdict(list)
+                    st.session_state.white_count = defaultdict(int)
+                    st.session_state.bye_count = defaultdict(int)
 
                     is_round_robin = (tournament_type in ["Один круг", "Два круга"])
                     if is_round_robin:
                         st.session_state.round_robin_schedule = generate_round_robin_schedule(players_list, total_rounds)
 
                     for rnd in range(1, total_rounds + 1):
-                        st.session_state.tour_data[rnd] = {
-                            "pairs": [],
-                            "bye": None,
-                            "results": [],
-                            "completed": False
-                        }
+                        st.session_state.tour_data[rnd] = {"pairs": [], "bye": None, "results": [], "completed": False}
 
                     # Первый тур
                     if is_round_robin:
                         round_pairs = st.session_state.round_robin_schedule[0]
-                        real_pairs = []
-                        bye = None
+                        real_pairs = []; bye = None
                         for p1, p2 in round_pairs:
-                            if p1 is None:
-                                bye = p2
-                            elif p2 is None:
-                                bye = p1
-                            else:
-                                white, black = decide_colors(p1, p2, st.session_state.color_history, 1, total_rounds)
-                                real_pairs.append((white, black))
-                        st.session_state.tour_data[1]["pairs"] = real_pairs
+                            if p1 is None: bye = p2; st.session_state.bye_count[p2] += 1
+                            elif p2 is None: bye = p1; st.session_state.bye_count[p1] += 1
+                            else: real_pairs.append((p1, p2))
+                        balanced_pairs = assign_colors_round_robin(real_pairs, st.session_state.white_count, st.session_state.bye_count)
+                        st.session_state.tour_data[1]["pairs"] = balanced_pairs
                         st.session_state.tour_data[1]["bye"] = bye
                     else:
-                        pairs, bye = initial_pairing_with_colors(
-                            players_list[:], 
-                            st.session_state.color_history, 
-                            1, 
-                            total_rounds
-                        )
+                        pairs, bye = initial_pairing_with_colors(players_list[:], st.session_state.color_history, 1, total_rounds)
                         st.session_state.tour_data[1]["pairs"] = pairs
                         st.session_state.tour_data[1]["bye"] = bye
-                        if bye:
-                            st.session_state.bye_history.add(bye)
+                        if bye: st.session_state.bye_history.add(bye)
 
                     st.session_state.current_round = 1
                     st.session_state.initialized = True
@@ -457,17 +431,13 @@ if st.session_state.initialized and not st.session_state.completed:
                     is_round_robin = (st.session_state.tournament_type in ["Один круг", "Два круга"])
                     if is_round_robin:
                         round_pairs = st.session_state.round_robin_schedule[next_rnd - 1]
-                        real_pairs = []
-                        bye = None
+                        real_pairs = []; bye = None
                         for p1, p2 in round_pairs:
-                            if p1 is None:
-                                bye = p2
-                            elif p2 is None:
-                                bye = p1
-                            else:
-                                white, black = decide_colors(p1, p2, st.session_state.color_history, next_rnd, st.session_state.total_rounds)
-                                real_pairs.append((white, black))
-                        st.session_state.tour_data[next_rnd]["pairs"] = real_pairs
+                            if p1 is None: bye = p2; st.session_state.bye_count[p2] += 1
+                            elif p2 is None: bye = p1; st.session_state.bye_count[p1] += 1
+                            else: real_pairs.append((p1, p2))
+                        balanced_pairs = assign_colors_round_robin(real_pairs, st.session_state.white_count, st.session_state.bye_count)
+                        st.session_state.tour_data[next_rnd]["pairs"] = balanced_pairs
                         st.session_state.tour_data[next_rnd]["bye"] = bye
                     else:
                         pairs, bye = swiss_pairing_with_colors(
@@ -495,13 +465,7 @@ if st.session_state.initialized and not st.session_state.completed:
             with col1:
                 st.write(f"**{p1} (Б) — {p2} (Ч)**")
             with col2:
-                res = st.selectbox(
-                    f"Результат {i+1}",
-                    options=["1-0", "0-1", "1/2-1/2"],
-                    index=2,
-                    key=f"res_{current}_{i}",
-                    label_visibility="collapsed"
-                )
+                res = st.selectbox(f"Результат {i+1}", ["1-0", "0-1", "1/2-1/2"], index=2, key=f"res_{current}_{i}", label_visibility="collapsed")
                 results.append((p1, p2, res))
 
         if data["bye"]:
@@ -514,13 +478,9 @@ if st.session_state.initialized and not st.session_state.completed:
                 st.session_state.played_pairs.add(frozenset({white, black}))
                 st.session_state.color_history[white].append('Б')
                 st.session_state.color_history[black].append('Ч')
-                if res == "1-0":
-                    st.session_state.scores[white] += 1.0
-                elif res == "0-1":
-                    st.session_state.scores[black] += 1.0
-                elif res == "1/2-1/2":
-                    st.session_state.scores[white] += 0.5
-                    st.session_state.scores[black] += 0.5
+                if res == "1-0": st.session_state.scores[white] += 1.0
+                elif res == "0-1": st.session_state.scores[black] += 1.0
+                elif res == "1/2-1/2": st.session_state.scores[white] += 0.5; st.session_state.scores[black] += 0.5
 
             if data["bye"]:
                 st.session_state.scores[data["bye"]] += 1.0
@@ -538,16 +498,9 @@ if st.session_state.initialized:
     st.divider()
     st.subheader("Таблица результатов")
 
-    buchholz = calculate_buchholz(
-        st.session_state.players,
-        st.session_state.scores,
-        st.session_state.opponents
-    )
+    buchholz = calculate_buchholz(st.session_state.players, st.session_state.scores, st.session_state.opponents)
 
-    sorted_players = sorted(
-        st.session_state.players,
-        key=lambda x: (-st.session_state.scores[x], -buchholz[x], x)
-    )
+    sorted_players = sorted(st.session_state.players, key=lambda x: (-st.session_state.scores[x], -buchholz[x], x))
 
     table_data = []
     place = 1
@@ -558,25 +511,16 @@ if st.session_state.initialized:
         current_key = (score, bh)
         displayed_place = place if prev_key is None or current_key != prev_key else displayed_place
         medal = " 👑" if displayed_place == 1 else " 🥈" if displayed_place == 2 else " 🥉" if displayed_place == 3 else ""
-        
         color_hist = st.session_state.color_history[name]
         white_count = color_hist.count('Б')
         total_games = len(color_hist)
         color_info = f"{white_count}/{total_games}" if total_games > 0 else "0/0"
-        
-        table_data.append({
-            "Место": displayed_place,
-            "Имя": name + medal,
-            "Очки": f"{score:.1f}",
-            "Бухгольц": f"{bh:.1f}",
-            "Белых": color_info
-        })
+        table_data.append({"Место": displayed_place, "Имя": name + medal, "Очки": f"{score:.1f}", "Бухгольц": f"{bh:.1f}", "Белых": color_info})
         prev_key = current_key
         place += 1
 
     st.dataframe(table_data, use_container_width=True, hide_index=True)
 
-# =============== Завершение ===============
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
