@@ -362,7 +362,7 @@ if not st.session_state.initialized:
                     default_rating = st.session_state.default_rating
                     show_rating_fields = st.session_state.show_nat_rating or st.session_state.show_fide_rating
 
-                    for p in st.session_state.players_
+                    for p in st.session_state.players:
                         full_name = f"{p['last_name'].strip()} {p['first_name'].strip()}"
                         players_list.append(full_name)
                         if show_rating_fields:
@@ -549,3 +549,4 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
+
