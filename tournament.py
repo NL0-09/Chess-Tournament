@@ -147,7 +147,7 @@ if not st.session_state.initialized:
                     "fshr_id": "", "fide_id": ""
                 })
         with col2:
-            if st.button("🗑️ Удалить последнего") and st.session_state.players_
+            if st.button("🗑️ Удалить последнего") and st.session_state.players_data:
                 st.session_state.players_data.pop()
 
         # Чекбокс для рейтинговой информации
@@ -472,3 +472,4 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
+
