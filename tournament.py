@@ -87,24 +87,26 @@ def swiss_pairing_with_colors(players, scores, played_pairs, bye_history, color_
     paired = set()
     pairs = []
 
-    for i, p1 in enumerate(sorted_players):
-        if p1 in paired:
-            continue
-        opponent = None
-        for p2 in sorted_players[i+1:]:
-            if p2 in paired:
+    # Проходы с разным допуском по очкам
+    for max_diff in [0.5, 1.0, float('inf')]:
+        for i, p1 in enumerate(sorted_players):
+            if p1 in paired:
                 continue
-            if frozenset({p1, p2}) in played_pairs:
-                continue
-            if abs(scores[p1] - scores[p2]) <= 0.5:
-                opponent = p2
-                break
-        if opponent:
-            white, black = decide_colors(p1, opponent, color_history, current_round, total_rounds)
-            pairs.append((white, black))
-            paired.add(p1)
-            paired.add(opponent)
-            played_pairs.add(frozenset({p1, opponent}))
+            opponent = None
+            for p2 in sorted_players[i+1:]:
+                if p2 in paired:
+                    continue
+                if frozenset({p1, p2}) in played_pairs:
+                    continue
+                if abs(scores[p1] - scores[p2]) <= max_diff:
+                    opponent = p2
+                    break
+            if opponent:
+                white, black = decide_colors(p1, opponent, color_history, current_round, total_rounds)
+                pairs.append((white, black))
+                paired.add(p1)
+                paired.add(opponent)
+                played_pairs.add(frozenset({p1, opponent}))
 
     unpaired = [p for p in players if p not in paired]
     bye = None
@@ -126,6 +128,14 @@ def swiss_pairing_with_colors(players, scores, played_pairs, bye_history, color_
                     white, black = decide_colors(a, b, color_history, current_round, total_rounds)
                     pairs.append((white, black))
                     played_pairs.add(frozenset({a, b}))
+    else:
+        # Чётное число — все ДОЛЖНЫ быть спарены
+        if len(unpaired) > 0:
+            # Это ошибка, но мы не даём BYE и не спариваем повторно
+            st.warning(f"Не удалось спарить всех игроков в туре {current_round}. Остались: {', '.join(unpaired)}")
+            # В реальной системе здесь должен быть более умный алгоритм
+            pass
+
     return pairs, bye
 
 def calculate_buchholz(players, scores, opponents):
@@ -179,13 +189,6 @@ if not st.session_state.initialized:
     # =============== Вкладка 1: Игроки и рейтинги ===============
     with tabs[0]:
         st.subheader("Игроки")
-        
-        if st.button("➕ Добавить игрока"):
-            st.session_state.players_data.append({
-                "last_name": "", "first_name": "",
-                "nat_rating": "", "fide_rating": "",
-                "fshr_id": "", "fide_id": ""
-            })
 
         with st.expander("Дополнительная информация", expanded=False):
             st.markdown("Выберите, какие поля отображать:")
@@ -204,6 +207,7 @@ if not st.session_state.initialized:
                 st.session_state.show_fide_id = show_fide_id
                 st.rerun()
 
+        # Определяем, показывать ли "Рейтинг по умолчанию"
         show_rating_fields = st.session_state.show_nat_rating or st.session_state.show_fide_rating
         if show_rating_fields:
             st.session_state.default_rating = st.number_input(
@@ -295,6 +299,13 @@ if not st.session_state.initialized:
                         "fshr_id": "", "fide_id": ""
                     }
                 st.divider()
+
+        if st.button("➕ Добавить игрока"):
+            st.session_state.players_data.append({
+                "last_name": "", "first_name": "",
+                "nat_rating": "", "fide_rating": "",
+                "fshr_id": "", "fide_id": ""
+            })
     
     # =============== Вкладка 2: Туры ===============
     with tabs[1]:
@@ -577,5 +588,6 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
+
 
 
