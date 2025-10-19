@@ -78,8 +78,8 @@ def generate_round_robin_schedule(players, rounds_needed):
 
     return full_schedule[:rounds_needed]
 
-def assign_colors_round_robin(pairs, white_count, bye_count):
-    """Назначает цвета с учётом числа BYE."""
+def assign_colors_round_robin(pairs, white_count, bye_count, color_history):
+    """Назначает цвета с учётом BYE и записывает в историю."""
     new_pairs = []
     for p1, p2 in pairs:
         if p1 is None or p2 is None:
@@ -98,6 +98,9 @@ def assign_colors_round_robin(pairs, white_count, bye_count):
                     white, black = p1, p2
                 else:
                     white, black = (p1, p2) if p1 < p2 else (p2, p1)
+            # Записываем в историю цветов
+            color_history[white].append('Б')
+            color_history[black].append('Ч')
             white_count[white] += 1
             new_pairs.append((white, black))
     return new_pairs
@@ -394,10 +397,20 @@ if not st.session_state.initialized:
                         round_pairs = st.session_state.round_robin_schedule[0]
                         real_pairs = []; bye = None
                         for p1, p2 in round_pairs:
-                            if p1 is None: bye = p2; st.session_state.bye_count[p2] += 1
-                            elif p2 is None: bye = p1; st.session_state.bye_count[p1] += 1
-                            else: real_pairs.append((p1, p2))
-                        balanced_pairs = assign_colors_round_robin(real_pairs, st.session_state.white_count, st.session_state.bye_count)
+                            if p1 is None: 
+                                bye = p2
+                                st.session_state.bye_count[p2] += 1
+                            elif p2 is None: 
+                                bye = p1
+                                st.session_state.bye_count[p1] += 1
+                            else: 
+                                real_pairs.append((p1, p2))
+                        balanced_pairs = assign_colors_round_robin(
+                            real_pairs,
+                            st.session_state.white_count,
+                            st.session_state.bye_count,
+                            st.session_state.color_history
+                        )
                         st.session_state.tour_data[1]["pairs"] = balanced_pairs
                         st.session_state.tour_data[1]["bye"] = bye
                     else:
@@ -433,10 +446,20 @@ if st.session_state.initialized and not st.session_state.completed:
                         round_pairs = st.session_state.round_robin_schedule[next_rnd - 1]
                         real_pairs = []; bye = None
                         for p1, p2 in round_pairs:
-                            if p1 is None: bye = p2; st.session_state.bye_count[p2] += 1
-                            elif p2 is None: bye = p1; st.session_state.bye_count[p1] += 1
-                            else: real_pairs.append((p1, p2))
-                        balanced_pairs = assign_colors_round_robin(real_pairs, st.session_state.white_count, st.session_state.bye_count)
+                            if p1 is None: 
+                                bye = p2
+                                st.session_state.bye_count[p2] += 1
+                            elif p2 is None: 
+                                bye = p1
+                                st.session_state.bye_count[p1] += 1
+                            else: 
+                                real_pairs.append((p1, p2))
+                        balanced_pairs = assign_colors_round_robin(
+                            real_pairs,
+                            st.session_state.white_count,
+                            st.session_state.bye_count,
+                            st.session_state.color_history
+                        )
                         st.session_state.tour_data[next_rnd]["pairs"] = balanced_pairs
                         st.session_state.tour_data[next_rnd]["bye"] = bye
                     else:
@@ -476,8 +499,10 @@ if st.session_state.initialized and not st.session_state.completed:
                 st.session_state.opponents[white].append(black)
                 st.session_state.opponents[black].append(white)
                 st.session_state.played_pairs.add(frozenset({white, black}))
-                st.session_state.color_history[white].append('Б')
-                st.session_state.color_history[black].append('Ч')
+                # Цвета уже записаны в assign_colors_round_robin, но для швейцарки — здесь
+                if st.session_state.tournament_type == "Швейцарская система":
+                    st.session_state.color_history[white].append('Б')
+                    st.session_state.color_history[black].append('Ч')
                 if res == "1-0": st.session_state.scores[white] += 1.0
                 elif res == "0-1": st.session_state.scores[black] += 1.0
                 elif res == "1/2-1/2": st.session_state.scores[white] += 0.5; st.session_state.scores[black] += 0.5
