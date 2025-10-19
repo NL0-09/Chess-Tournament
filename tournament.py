@@ -390,10 +390,6 @@ if not st.session_state.initialized:
                     is_round_robin = (tournament_type in ["Один круг", "Два круга"])
                     if is_round_robin:
                         st.session_state.round_robin_schedule = generate_round_robin_schedule(players_list, total_rounds)
-                        # Проверка
-                        if not st.session_state.round_robin_schedule:
-                            st.error("Не удалось сгенерировать расписание кругового турнира.")
-                            return
 
                     for rnd in range(1, total_rounds + 1):
                         st.session_state.tour_data[rnd] = {"pairs": [], "bye": None, "results": [], "completed": False}
@@ -560,4 +556,5 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
+
 
