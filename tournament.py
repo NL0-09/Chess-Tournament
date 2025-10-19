@@ -108,7 +108,7 @@ if "initialized" not in st.session_state:
     st.session_state.tour_data = {}
     st.session_state.completed = False
 
-# =============== Инструкция ===============
+# =============== Инструкция (простая, без формул) ===============
 with st.expander("📌 Инструкция", expanded=not st.session_state.initialized):
     st.markdown("""
     **Как пользоваться программой:**
@@ -158,27 +158,29 @@ if not st.session_state.initialized:
 
     total_rounds_input = 6
     if n_players >= 9:
-        # Максимум без повторных встреч = число туров в круговом
-        max_rounds_round_robin = n_players if n_players % 2 == 1 else n_players - 1
-        max_allowed = min(11, max_rounds_round_robin)
+        # Максимум без повторных встреч = число туров в круговом турнире
+        if n_players % 2 == 1:
+            max_rounds_circle = n_players
+        else:
+            max_rounds_circle = n_players - 1
+
+        max_allowed = min(11, max_rounds_circle)
 
         # Минимум: ceil(log2(N)), но не менее 3
         min_theoretical = math.ceil(math.log2(n_players))
         min_allowed = max(3, min_theoretical)
 
-        # Защита от некорректных границ
         if min_allowed > max_allowed:
-            min_allowed = max(1, max_allowed)
+            min_allowed = max_allowed
+
+        default_rounds = min(min_allowed + 2, max_allowed)
 
         total_rounds_input = st.slider(
             "Выберите количество туров:",
             min_value=min_allowed,
             max_value=max_allowed,
-            value=min(min_allowed + 2, max_allowed),
-            help=f"Для {n_players} участников:\n"
-                 f"• Минимум (⌈log₂(N)⌉): {min_theoretical}\n"
-                 f"• Максимум без повторов: {max_rounds_round_robin}\n"
-                 f"• Ограничение: не более 11 туров."
+            value=default_rounds,
+            help=f"Для {n_players} участников максимально возможное число туров без повторных встреч — {max_rounds_circle}."
         )
     elif is_round_robin:
         auto_rounds = n_players - 1 if n_players % 2 == 0 else n_players
