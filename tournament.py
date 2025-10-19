@@ -39,6 +39,8 @@ def decide_colors(p1, p2, color_history, current_round, total_rounds):
 
 def generate_round_robin_schedule(players, rounds_needed):
     """Генерация расписания кругового турнира."""
+    if not players or rounds_needed <= 0:
+        return []
     players = players[:]
     n = len(players)
     is_odd = (n % 2 == 1)
@@ -362,7 +364,7 @@ if not st.session_state.initialized:
                     default_rating = st.session_state.default_rating
                     show_rating_fields = st.session_state.show_nat_rating or st.session_state.show_fide_rating
 
-                    for p in st.session_state.players:
+                    for p in st.session_state.players_
                         full_name = f"{p['last_name'].strip()} {p['first_name'].strip()}"
                         players_list.append(full_name)
                         if show_rating_fields:
@@ -388,12 +390,19 @@ if not st.session_state.initialized:
                     is_round_robin = (tournament_type in ["Один круг", "Два круга"])
                     if is_round_robin:
                         st.session_state.round_robin_schedule = generate_round_robin_schedule(players_list, total_rounds)
+                        # Проверка
+                        if not st.session_state.round_robin_schedule:
+                            st.error("Не удалось сгенерировать расписание кругового турнира.")
+                            return
 
                     for rnd in range(1, total_rounds + 1):
                         st.session_state.tour_data[rnd] = {"pairs": [], "bye": None, "results": [], "completed": False}
 
                     # Первый тур
                     if is_round_robin:
+                        if not st.session_state.round_robin_schedule:
+                            st.error("Расписание кругового турнира не сгенерировано.")
+                            return
                         round_pairs = st.session_state.round_robin_schedule[0]
                         real_pairs = []; bye = None
                         for p1, p2 in round_pairs:
@@ -443,6 +452,9 @@ if st.session_state.initialized and not st.session_state.completed:
                 if not st.session_state.tour_data[next_rnd]["pairs"]:
                     is_round_robin = (st.session_state.tournament_type in ["Один круг", "Два круга"])
                     if is_round_robin:
+                        if not st.session_state.round_robin_schedule:
+                            st.error("Расписание кругового турнира не сгенерировано.")
+                            return
                         round_pairs = st.session_state.round_robin_schedule[next_rnd - 1]
                         real_pairs = []; bye = None
                         for p1, p2 in round_pairs:
@@ -499,7 +511,6 @@ if st.session_state.initialized and not st.session_state.completed:
                 st.session_state.opponents[white].append(black)
                 st.session_state.opponents[black].append(white)
                 st.session_state.played_pairs.add(frozenset({white, black}))
-                # Цвета уже записаны в assign_colors_round_robin, но для швейцарки — здесь
                 if st.session_state.tournament_type == "Швейцарская система":
                     st.session_state.color_history[white].append('Б')
                     st.session_state.color_history[black].append('Ч')
@@ -549,4 +560,3 @@ if st.session_state.initialized:
 if st.session_state.completed:
     st.balloons()
     st.success("🏆 Турнир завершён! Поздравляем победителей!")
-
