@@ -38,6 +38,7 @@ def decide_colors(p1, p2, color_history, current_round, total_rounds):
         return (p2, p1)
 
 def generate_round_robin_schedule(players, rounds_needed):
+    """Генерация расписания кругового турнира с фиксацией цветов."""
     players = players[:]
     n = len(players)
     is_odd = (n % 2 == 1)
@@ -49,6 +50,7 @@ def generate_round_robin_schedule(players, rounds_needed):
     full_schedule = []
     current = players[:]
 
+    # Первый круг
     for r in range(base_rounds):
         pairs = []
         for i in range(n // 2):
@@ -59,14 +61,21 @@ def generate_round_robin_schedule(players, rounds_needed):
             elif p2 == "BYE":
                 pairs.append((p1, None))
             else:
-                pairs.append((p1, p2))
+                pairs.append((p1, p2))  # p1 — белые, p2 — чёрные
         full_schedule.append(pairs)
         current = [current[0]] + [current[-1]] + current[1:-1]
 
+    # Второй круг — меняем порядок в парах (белые/чёрные меняются)
     if rounds_needed > base_rounds:
         second_circle = []
         for pairs in full_schedule:
-            second_circle.append(pairs)
+            new_pairs = []
+            for p1, p2 in pairs:
+                if p1 is None or p2 is None:
+                    new_pairs.append((p1, p2))
+                else:
+                    new_pairs.append((p2, p1))  # p2 — белые, p1 — чёрные
+            second_circle.append(new_pairs)
         full_schedule.extend(second_circle)
 
     return full_schedule[:rounds_needed]
